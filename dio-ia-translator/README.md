@@ -1,12 +1,16 @@
 # 🌐 Azure Universal Lyric Translator & Vibe Analyzer
 
 ---
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)]([https://dio-ia-translator.streamlit.app/]))
-[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
+![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-0072C6?style=for-the-badge&logo=microsoftazure&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)
+![Python](https://img.shields.io/badge/python-3.10-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Paradigma](https://img.shields.io/badge/Paradigma-POO-blueviolet?style=for-the-badge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 📝 Descrição do Projeto
 Este projeto é um tradutor poliglota de letras de música que utiliza a stack de **IA Generativa da Microsoft Azure**. O diferencial desta solução é a camada de **Governança de Dados** e o módulo inovador de **Análise de Vibe (Sentimento)**, que interpreta o tom emocional da obra original.
+
+> **Status do Projeto:** 🚀 [CLIQUE AQUI PARA TESTAR O APP AO VIVO](https://dio-ia-translator.streamlit.app/)
 
 Desenvolvido como projeto final para o Bootcamp de IA da **DIO**, aplicando conceitos avançados de Programação Orientada a Objetos (POO) e Segurança da Informação.
 
