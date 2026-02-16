@@ -1,6 +1,7 @@
 # 🌐 Azure Universal Lyric Translator & Vibe Analyzer
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](SEU_LINK_DO_STREAMLIT_AQUI)
+---
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)]([https://dio-ia-translator.streamlit.app/]))
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
