@@ -6,7 +6,7 @@
 ![MIT License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
 
 ### 🔗 Acesse a aplicação em tempo real:
-[![Abrir no Streamlit](https://static.streamlit.io/badges/streamlit_badge_svg)](https://antifraude-ai.streamlit.app/)
+[![Abrir no Streamlit](https://static.streamlit.io/badges/streamlit_badge_svg)]([(https://dio-ia-travel-auditor.streamlit.app/)])
 
 O **AI Travel Auditor** é uma solução de ponta que automatiza o processo de auditoria de recibos de viagem. Utilizando **Inteligência Artificial Documental**, o sistema garante o cumprimento das políticas corporativas, prevenindo fraudes financeiras e garantindo conformidade (compliance) em tempo real.
 
