@@ -9,22 +9,21 @@ load_dotenv()
 
 # --- CAMADA DE TESTES E GOVERNANÇA ---
 def system_health_check():
-    """Valida se as chaves da Azure estão presentes antes de iniciar."""
+    """Valida se as chaves da Azure estão presentes."""
     endpoint = os.getenv("AZURE_ENDPOINT")
     key = os.getenv("AZURE_KEY")
     if not endpoint or not key:
-        return False, "🚨 Configuração ausente: Verifique as chaves AZURE_ENDPOINT e AZURE_KEY."
+        return False, "🚨 Erro: Verifique as chaves AZURE_ENDPOINT e AZURE_KEY no Secrets."
     return True, "✅ Conexão Azure: OK"
 
-# --- CAMADA DE INTELIGÊNCIA (Com Redundância) ---
+# --- CAMADA DE INTELIGÊNCIA ---
 def analyze_document(image_file, model_type="prebuilt-receipt"):
-    """Envia o documento para a Azure usando o modelo especificado."""
+    """Processa o documento na Azure."""
     endpoint = os.getenv("AZURE_ENDPOINT")
     key = os.getenv("AZURE_KEY")
     client = DocumentIntelligenceClient(endpoint, AzureKeyCredential(key))
     
-    # Reposiciona o ponteiro do arquivo para garantir leitura múltipla se necessário
-    image_file.seek(0)
+    image_file.seek(0) # Reseta o ponteiro para leitura
     
     poller = client.begin_analyze_document(
         model_type, 
@@ -34,83 +33,82 @@ def analyze_document(image_file, model_type="prebuilt-receipt"):
     return poller.result()
 
 def check_compliance(result):
-    """Aplica as regras de negócio: Teto R$ 80 e Filtro de Álcool."""
+    """Aplica regras de teto de R$ 80 e proibição de álcool."""
     violations = []
     total_value = 0.0
     found_total = False
     
-    # Lista de Auditoria: Itens Proibidos
-    prohibited_items = ["cerveja", "chopp", "vinho", "caipirinha", "vodka", "whisky", "margarita", "bebida alcoolica", "beer", "wine", "alcohol", "lata"]
+    # Lista de Auditoria
+    prohibited_items = ["cerveja", "chopp", "vinho", "caipirinha", "vodka", "whisky", "beer", "wine", "alcohol"]
 
     for doc in result.documents:
-        # 1. Extração do Valor Total (Busca em múltiplos campos possíveis)
-        total_field = doc.fields.get("Total") or doc.fields.get("TotalAmount") or doc.fields.get("AmountDue")
+        # Busca flexível pelo valor total (comum em notas BR)
+        fields = doc.fields
+        total_field = fields.get("Total") or fields.get("TotalAmount") or fields.get("AmountDue")
         
         if total_field and total_field.value_number is not None:
             total_value = total_field.value_number
             if total_value > 0:
                 found_total = True
                 if total_value > 80.0:
-                    violations.append(f"⚠️ Alerta Financeiro: Gasto de R$ {total_value:.2f} excede o teto de R$ 80,00.")
+                    violations.append(f"⚠️ Excede teto: R$ {total_value:.2f} (Limite: R$ 80,00)")
         
-        # 2. Auditoria de Itens (Filtro de Fraudes)
-        if doc.fields.get("Items"):
-            for item in doc.fields.get("Items").value_array:
-                description_field = item.value_object.get("Description") or item.value_object.get("Content")
-                item_description = description_field.value_string.lower() if description_field else ""
+        # Auditoria de Itens
+        if fields.get("Items"):
+            for item in fields.get("Items").value_array:
+                item_data = item.value_object
+                desc = item_data.get("Description") or item_data.get("Content")
+                item_text = desc.value_string.lower() if desc else ""
                 
                 for forbidden in prohibited_items:
-                    if forbidden in item_description:
-                        violations.append(f"🚫 Violação de Compliance: Item proibido -> '{item_description}'.")
+                    if forbidden in item_text:
+                        violations.append(f"🚫 Item proibido: '{item_text}'")
 
     is_compliant = len(violations) == 0 and found_total
     return is_compliant, total_value, violations
 
-# --- INTERFACE (STREAMLIT) ---
+# --- INTERFACE ---
 st.set_page_config(page_title="AI Travel Auditor", page_icon="🛡️")
 
 st.title("🛡️ AI Travel Auditor")
-st.markdown("### Auditoria Inteligente e Compliance (Padrão Nota Fiscal BR)")
+st.markdown("### Auditoria Inteligente e Compliance")
 
-# Check de Saúde na Sidebar
 is_healthy, health_msg = system_health_check()
 if not is_healthy:
     st.error(health_msg)
     st.stop()
-st.sidebar.success(health_msg)
 
-uploaded_file = st.file_uploader("Subir Cupom ou Nota Fiscal (JPG, PNG, PDF)", type=["jpg", "jpeg", "png", "pdf"])
+st.sidebar.success(health_msg)
+uploaded_file = st.file_uploader("Subir Cupom ou Nota Fiscal", type=["jpg", "jpeg", "png", "pdf"])
 
 if uploaded_file:
-    with st.spinner('Iniciando Auditoria Multinível...'):
+    with st.spinner('Auditando documento...'):
         try:
-            # PASSO 1: Tenta como Recibo Genérico
+            # Estratégia Multinível: Tenta Recibo, se falhar tenta Fatura
             result = analyze_document(uploaded_file, "prebuilt-receipt")
             compliant, total, errors = check_compliance(result)
 
-            # PASSO 2: Se o valor for 0 ou não encontrado, tenta como Invoice (Nota Fiscal)
             if total <= 0:
-                st.sidebar.warning("🔄 Recibo complexo detectado. Acionando modelo de Nota Fiscal...")
+                st.sidebar.warning("🔄 Refinando análise como Nota Fiscal...")
                 result = analyze_document(uploaded_file, "prebuilt-invoice")
                 compliant, total, errors = check_compliance(result)
 
             st.divider()
             
             if compliant:
-                st.success(f"✅ RECIBO APROVADO! Valor Identificado: R$ {total:.2f}")
+                st.success(f"✅ APROVADO! Valor: R$ {total:.2f}")
                 st.balloons()
             else:
-                st.error("❌ RECIBO REPROVADO")
+                st.error("❌ REPROVADO")
                 if not errors and total == 0:
-                    st.warning("🚨 Não foi possível extrair dados financeiros deste documento. Verifique a imagem.")
+                    st.warning("🚨 Não foi possível identificar valores financeiros.")
                 for error in errors:
                     st.warning(error)
-                st.info(f"Valor Final Processado: R$ {total:.2f}")
+                st.info(f"Valor extraído: R$ {total:.2f}")
 
         except Exception as e:
-            st.error(f"🚨 Falha Técnica: {str(e)}")
+            st.error(f"🚨 Erro técnico: {str(e)}")
 
 st.sidebar.markdown("---")
-st.sidebar.write("**Regras de Negócio:**")
 st.sidebar.write("✅ Limite: R$ 80,00")
-st.sidebar.write("✅ Tolerância Zero:
+st.sidebar.write("✅ Tolerância Zero: Álcool")
