@@ -137,8 +137,7 @@ if uploaded_file:
 
 st.sidebar.markdown("---")
 st.sidebar.write("**Políticas de Auditoria:**")
-st.sidebar.
-
-st.sidebar.info("Governança: Teto R$ 80 | Zero Álcool")
+st.sidebar.write("- Limite por recibo: R$ 80,00")
+st.sidebar.write("- Restrição total de itens alcoólicos")
 
 
