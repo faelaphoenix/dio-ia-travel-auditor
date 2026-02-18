@@ -1,5 +1,4 @@
 # 🛡️ AI Travel Auditor: Inteligência Artificial na Governança de Despesas
-
 ---
 ![Azure](https://img.shields.io/badge/azure-%230072C6.svg?style=for-the-badge&logo=microsoftazure&logoColor=white)
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
