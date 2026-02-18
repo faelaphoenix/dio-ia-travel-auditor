@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- CONFIGURAÇÃO DE GOVERNANÇA ---
-# Nome do modelo que aparece no seu Studio
+# Nome do modelo que aparece no meu Studio
 CUSTOM_MODEL_ID = "travel-auditor" 
 
 def system_health_check():
@@ -88,7 +88,7 @@ uploaded_file = st.file_uploader("Subir Recibo para Auditoria", type=["jpg", "pn
 if uploaded_file:
     with st.spinner('Iniciando auditoria inteligente...'):
         try:
-            # PASSO 1: Tenta o seu modelo Especialista (Custom)
+            # PASSO 1: Tenta o meu modelo Especialista (Custom)
             result = analyze_document(uploaded_file, CUSTOM_MODEL_ID)
             compliant, total, errors = check_compliance(result)
 
@@ -117,3 +117,4 @@ if uploaded_file:
                 st.error(f"🚨 Erro técnico: {str(e)}")
 
 st.sidebar.info("Governança: Teto R$ 80 | Zero Álcool")
+
