@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # Carrego as variáveis de ambiente para garantir a segurança das credenciais
 load_dotenv()
 
-# Defino o ID do modelo que treinei no Document Intelligence Studio para notas específicas
+# Nome do modelo que treinei no Studio - Garanto que o nome esteja idêntico
 CUSTOM_MODEL_ID = "travel-auditor" 
 
 def system_health_check():
@@ -16,7 +16,7 @@ def system_health_check():
     key = os.getenv("AZURE_KEY")
     if not endpoint or not key:
         return False, "🚨 Configuração ausente: Verifique AZURE_ENDPOINT e AZURE_KEY."
-    return True, "✅ Conexão Azure estabelecida com sucesso."
+    return True, "✅ Conexão Azure estabelecida."
 
 def analyze_document(image_file, model_id):
     """Executo a chamada para a API da Azure utilizando o modelo de IA solicitado."""
@@ -35,109 +35,113 @@ def analyze_document(image_file, model_id):
     return poller.result()
 
 def check_compliance(result):
-    """Aplico as regras de governança: Teto de R$ 80 e proibição estrita de álcool."""
+    """Eu realizo uma varredura profunda para garantir que nenhum dado financeiro seja ignorado."""
     violations = []
     total_value = 0.0
     found_total = False
     
-    # Lista de termos que ferem a política de reembolso da empresa
+    # Minha lista de auditoria para itens proibidos
     prohibited_items = ["cerveja", "chopp", "vinho", "vodka", "whisky", "caipirinha", "beer", "wine", "alcohol"]
 
     for doc in result.documents:
-        # Busco o valor total tentando mapear campos de modelos Custom e Prebuilt
-        total_field = doc.fields.get("Total") or doc.fields.get("TotalAmount")
+        # Busco o valor total em todas as nomenclaturas possíveis da Azure (Custom e Prebuilt)
+        fields = doc.fields
+        total_field = fields.get("Total") or fields.get("TotalAmount") or fields.get("AmountDue") or fields.get("TotalValue")
         
-        if total_field and total_field.value_number is not None:
-            total_value = total_field.value_number
+        if total_field:
+            # Tento extrair o valor numérico puro
+            if total_field.value_number is not None:
+                total_value = total_field.value_number
+            # Fallback para caso o valor venha como moeda (comum em modelos de recibo)
+            elif hasattr(total_field, 'value_currency') and total_field.value_currency:
+                total_value = total_field.value_currency.amount
+            
             if total_value > 0:
                 found_total = True
-                # Regra de negócio: Limite de despesa
+                # Regra de governança: Limite de R$ 80,00
                 if total_value > 80.0:
-                    violations.append(f"⚠️ Alerta: Valor R$ {total_value:.2f} excede o teto permitido de R$ 80,00.")
+                    violations.append(f"⚠️ Alerta Compliance: Valor R$ {total_value:.2f} excede o teto de R$ 80,00.")
         
-        # Realizo a varredura de itens para identificar possíveis fraudes ou itens não reembolsáveis
-        if doc.fields.get("Items"):
-            items_list = doc.fields.get("Items").value_array
-            for item in items_list:
-                # Trato a descrição do item independente da estrutura de retorno do modelo
-                if hasattr(item, 'value_object'):
-                    desc_obj = item.value_object.get("Description") or item.value_object.get("Content")
-                    desc = desc_obj.value_string.lower() if desc_obj else ""
+        # Auditoria resiliente de itens para identificar itens não reembolsáveis
+        if fields.get("Items"):
+            for item in fields.get("Items").value_array:
+                item_text = ""
+                # Se for um objeto complexo (Prebuilt), busco a descrição interna
+                if hasattr(item, 'value_object') and item.value_object:
+                    desc_field = item.value_object.get("Description") or item.value_object.get("Content")
+                    item_text = desc_field.value_string.lower() if desc_field else ""
+                # Se for uma string simples (Custom), uso o valor direto
+                elif hasattr(item, 'value_string'):
+                    item_text = item.value_string.lower()
                 else:
-                    desc = str(item.value_string if hasattr(item, 'value_string') else item).lower()
+                    item_text = str(item).lower()
                 
                 for forbidden in prohibited_items:
-                    if forbidden in desc:
-                        violations.append(f"🚫 Violação de Compliance: Item proibido detectado -> '{desc}'.")
+                    if forbidden in item_text:
+                        violations.append(f"🚫 Violação: Item proibido detectado -> '{item_text}'.")
 
-    # O recibo só é complacente se não houver violações e o valor total for identificado
+    # Retorno o veredito: aprovado apenas se houver total identificado e zero violações
     is_compliant = len(violations) == 0 and found_total
     return is_compliant, total_value, violations
 
-# --- Interface de Usuário (Streamlit) ---
+# --- Interface Streamlit ---
 st.set_page_config(page_title="Auditor de Viagens IA", page_icon="🛡️")
 
 st.title("🛡️ AI Travel Auditor")
-st.markdown(f"**Arquitetura:** Cascata de Fallback (Custom + Receipts + Invoices)")
+st.markdown(f"**Governança:** Análise Híbrida (Custom + Recibos + Faturas)")
 
-# Valido a saúde do sistema antes de permitir o upload
 is_healthy, health_msg = system_health_check()
 if not is_healthy:
     st.error(health_msg)
     st.stop()
 
-uploaded_file = st.file_uploader("Faça o upload do recibo (JPG, PNG ou PDF)", type=["jpg", "png", "pdf"])
+uploaded_file = st.file_uploader("Subir Recibo ou Nota Fiscal (JPG, PNG, PDF)", type=["jpg", "png", "pdf"])
 
 if uploaded_file:
-    with st.spinner('Processando auditoria multinível...'):
+    with st.spinner('Executando Cascata de Auditoria...'):
         try:
             total = 0
             result = None
             
-            # TENTATIVA 1: Utilizo meu modelo customizado, treinado para layouts específicos
+            # PASSO 1: Tento meu modelo Custom (Treinado para meus padrões)
             try:
                 result = analyze_document(uploaded_file, CUSTOM_MODEL_ID)
                 compliant, total, errors = check_compliance(result)
             except Exception:
-                # Caso o modelo customizado esteja offline ou em treino, registro e sigo o fluxo
-                st.sidebar.info(f"⏳ Modelo '{CUSTOM_MODEL_ID}' indisponível. Acionando contingência.")
+                st.sidebar.info(f"ℹ️ Custom Model '{CUSTOM_MODEL_ID}' indisponível. Seguindo...")
 
-            # TENTATIVA 2: Se o valor não foi capturado, recorro ao modelo geral de Recibos
+            # PASSO 2: Se falhar, tento o modelo Geral de Recibos
             if total <= 0:
-                st.sidebar.warning("🔄 Analisando via modelo genérico (Prebuilt Receipts).")
+                st.sidebar.warning("🔄 Recorrendo ao modelo Prebuilt Receipts...")
                 result = analyze_document(uploaded_file, "prebuilt-receipt")
                 compliant, total, errors = check_compliance(result)
 
-            # TENTATIVA 3: Último recurso - utilizo o modelo de Invoices para notas fiscais complexas
+            # PASSO 3: Última tentativa com o modelo de Faturas (Invoices)
             if total <= 0:
-                st.sidebar.warning("🔄 Analisando via modelo de Notas Fiscais (Invoices).")
+                st.sidebar.warning("🔄 Recorrendo ao modelo Prebuilt Invoices...")
                 result = analyze_document(uploaded_file, "prebuilt-invoice")
                 compliant, total, errors = check_compliance(result)
 
             st.divider()
             
-            # Exibo o veredito final baseado na análise da IA
             if total > 0:
                 if compliant:
-                    st.success(f"✅ RECIBO APROVADO! Valor extraído: R$ {total:.2f}")
+                    st.success(f"✅ RECIBO APROVADO! Total: R$ {total:.2f}")
                     st.balloons()
                 else:
                     st.error("❌ RECIBO REPROVADO")
                     for error in errors:
                         st.warning(error)
             else:
-                st.error("❌ ERRO DE LEITURA: Não foi possível identificar valores financeiros.")
+                st.error("❌ FALHA GERAL: Não foi possível extrair valores financeiros.")
 
         except Exception as e:
-            # Gerenciamento de cota F0 da Azure
             if "429" in str(e):
-                st.error("⚠️ Limite de requisições atingido (Cota F0). Aguarde 60 segundos.")
+                st.error("⚠️ Cota F0 atingida. Aguarde 60 segundos.")
             else:
-                st.error(f"🚨 Falha técnica no processamento: {str(e)}")
+                st.error(f"🚨 Erro técnico inesperado: {str(e)}")
 
 st.sidebar.markdown("---")
-st.sidebar.write("**Políticas de Auditoria:**")
-st.sidebar.write("- Limite por recibo: R$ 80,00")
-st.sidebar.write("- Restrição total de itens alcoólicos")
+st.sidebar.info("Políticas: Teto R$ 80 | Álcool Proibido")
 
 
